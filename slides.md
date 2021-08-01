@@ -11,6 +11,9 @@ style: |
   section.lead footer {
     text-align: right;
   }
+  section h2 {
+    text-align: center;
+  }
 ---
 
 <!--
@@ -20,18 +23,19 @@ footer: "Presented by [RC](https://github.com/richardchien)"
 
 # Why Write OS In Rust?
 
-#### ChCoreCon #7, 3/1/2021
+v2.0
 
 ---
 
 <!--
-backgroundImage: url('assets/bg.png')
+backgroundImage: url('assets/bg-outline.png')
 footer: ""
 -->
 
 ## Outline
 
-- Safety
+- Language Basics
+- Memory Safety
 - Expression
 - Interoperability
 - Performance
@@ -43,7 +47,8 @@ footer: ""
 
 ## Outline
 
-- **Safety** 👈
+- **Language Basics ◁**
+- Memory Safety
 - Expression
 - Interoperability
 - Performance
@@ -53,17 +58,234 @@ footer: ""
 
 ---
 
-## Safety
+<!--
+backgroundImage: url('assets/bg.png')
+-->
+
+## Variables
+
+- Immutable by default
+- Shadowing
+
+```rust
+let x = 0;
+x = 42; // error: cannot assign twice to immutable variable `x`
+
+let mut y = 0;
+y = 42; // ok
+```
+
+```rust
+let x = foo();
+let x = x.unwrap(); // this `x` is different from the above one
+```
+
+---
+
+## Ownership
+
+- Move semantics
+
+```rust
+let x = String::from("foo");
+let y = x;
+println!("{}", x); // error: borrow of moved value: `x`
+```
+
+```cpp
+// C++: similar but different
+auto x = std::string("foo");
+auto y = std::move(x);
+std::cout << x << std::endl; // ok, `x` is in valid but unspecified state
+```
+
+---
+
+## Ownership
+
+```rust
+#[derive(Debug)]
+struct MyString(String);
+
+fn foo1(s: String) { println!("len: {}", s.len()); }
+fn foo2(s: String) -> MyString { println!("len: {}", s.len()); MyString(s) }
+
+pub fn main() {
+    let x = String::from("foo");
+    foo1(x);
+    let x = String::from("bar");
+    let x = foo2(x);
+    println!("{:?}", x);
+}
+```
+
+---
+
+## Borrowing
+
+- Multiple immutable references, or
+- Single mutable reference
+
+```rust
+let x = String::from("foo");
+let y = &x;
+let z = &x;
+println!("{}, {}, {}", x, y, z); // ok
+```
+
+```rust
+let mut x = String::from("foo");
+let y = &mut x;
+let z = &mut x; // error: cannot borrow `x` as mutable more than once at a time
+y; z;
+```
+
+---
+
+## Borrowing
+
+```rust
+let mut x = 0;
+let y = &x;
+x = 42; // error: cannot assign to `x` because it is borrowed
+// *(&mut x) = 42; // basically the same thing
+y;
+```
+
+```rust
+let mut x = 0;
+let y = &mut x;
+*y = 42; // ok
+x; // error: cannot use `x` because it was mutably borrowed
+// *(&x); // basically the same thing
+y;
+```
+
+---
+
+## Smart Pointers
+
+- `Box<T>`: data on the heap
+
+```rust
+let x = Box::new(42);
+let mut y = x;
+*y += 1;
+// there is no `y = nullptr` in Rust
+```
+
+```cpp
+// C++
+auto x = std::make_unique<int>(42);
+auto y = std::move(x);
+*y += 1;
+y = nullptr;
+auto z = *y; // runtime error: segmentation fault
+```
+
+---
+
+## Smart Pointers
+
+- `Rc<T>`: multiple ownership (reference count)
+
+```rust
+fn foo(val: Rc<String>) { val; /* consumes val */ }
+
+let x = Rc::new(String::from("foo"));
+foo(x.clone()); // pass a clone of Rc, instead of moving `x` in
+println!("{}", x); // ok
+```
+
+---
+
+## Smart Pointers
+
+- `Cell<T>`: interior mutability
+- `RefCell<T>`: interior mutability + runtime borrow checking
+
+```rust
+let x = Cell::new(42);
+let y = x.replace(0);
+assert_eq!(x.get(), 0);
+assert_eq!(y, 42);
+```
+
+```rust
+let x = RefCell::new(42);
+let ref1 = x.borrow();
+let ref2 = x.borrow();
+let ref3 = x.borrow_mut(); // runtime error: already borrowed
+```
+
+---
+
+## Doubly Linked List
+
+- Why it's not easy to implement?
+    - Because you have to think in Rust.
+
+- How to implement?
+    ```rust
+    struct Node<T> {
+        pub data: T,
+        pub prev: Option<Weak<RefCell<Node<T>>>>,
+        pub next: Option<Rc<RefCell<Node<T>>>>,
+    }
+    ```
+    - [Full example](https://gist.github.com/anonymous/c3db81ec94bf231b721ef483f58deb35)
+
+---
+
+## Unsafe
+
+In Safe Rust, the **compiler** ensures soundness;
+
+In Unsafe Rust, **programmers** ensure soundness.
+
+Read [The Rustonomicon](https://doc.rust-lang.org/nomicon/) before writing unsafe code.
+
+---
+
+<!--
+backgroundImage: url('assets/bg-outline.png')
+-->
+
+## Outline
+
+- Language Basics
+- **Memory Safety ◁**
+- Expression
+- Interoperability
+- Performance
+- Usability
+- Drawbacks
+- Summary
+
+---
+
+<!--
+backgroundImage: url('assets/bg.png')
+-->
+
+## Memory Safety
+
+- Microsoft: [70% of all vulnerabilities in their products](https://msrc-blog.microsoft.com/2019/07/18/we-need-a-safer-systems-programming-language/) over the past decade have been caused by a lack of memory safety.
+- Chromium: [70% of serious security bugs](https://www.chromium.org/Home/chromium-security/memory-safety/) are memory safety problems.
+- Android: [90% of their vulnerabilities](https://security.googleblog.com/2019/05/queue-hardening-enhancements.html) are memory safety issues.
+- Mozilla: [74% of Firefox’s security bugs](https://hacks.mozilla.org/2019/02/rewriting-a-browser-component-in-rust/) in its style component are memory safety bugs.
+
+---
+
+## Memory Safety
 
 - Spatial memory safety
 - Temporal memory safety
 - Thread safety
 
-According to [the MSRC blog](https://msrc-blog.microsoft.com/2019/07/18/we-need-a-safer-systems-programming-language/), **70%** of the security issues that it assigns a CVE to are memory safety issues!
-
 ---
 
-## Spatial memory safety
+## Spatial Memory Safety
 
 How C sucks:
 
@@ -85,18 +307,18 @@ int someos_file_write(int fd, void *buf, size_t count) {
 
 ---
 
-## Spatial memory safety
+## Spatial Memory Safety
 
 At least 4 bugs in the above C code!
 
 1. `int fd`: `fd` can be negative or zero
-2. `void *buf`: `buf` can be null
-3. `remain = count`: `remain` can be negative due to unmatched type
-4. `buf = (char *)buf + ret`: `ret` can be negative, causing out-of-bound access
+2. `void *buf`: `buf` can be null or have unmatched size
+3. `remain = count`: `remain` can be negative or very large due to unmatched type
+4. `ret = ipc_call(fr);`: no error checking for `ret`
 
 ---
 
-## Spatial memory safety
+## Spatial Memory Safety
 
 What features of Rust can help?
 
@@ -107,7 +329,7 @@ What features of Rust can help?
 
 ---
 
-## Spatial memory safety
+## Spatial Memory Safety
 
 Same thing implemented in Rust:
 
@@ -129,7 +351,7 @@ fn someos_file_write(fd: FileDescriptor, buf: &mut [u8]) -> SomeOsResult<usize> 
 
 ---
 
-## Spatial memory safety
+## Spatial Memory Safety
 
 What if forgot `min(written + FS_BUF_SIZE, count)`?
 
@@ -140,12 +362,12 @@ let buf_slice = &mut buf[written..written + FS_BUF_SIZE];
 If `written + FS_BUF_SIZE` is larger than `buf.len()`, it'll panic:
 
 ```
-thread 'main' panicked at 'range end index 1024 out of range for slice of length 512', src/main.rs:23:30
+thread 'main' panicked at 'range end index 1024 out of range for slice of length 512'
 ```
 
 ---
 
-## Temporal memory safety
+## Temporal Memory Safety
 
 A bad example in C:
 
@@ -166,7 +388,7 @@ void func() {
 
 ---
 
-## Temporal memory safety
+## Temporal Memory Safety
 
 What features of Rust can help?
 
@@ -175,7 +397,7 @@ What features of Rust can help?
 
 ---
 
-## Temporal memory safety
+## Temporal Memory Safety
 
 Try the same in Rust (consider only immutable buffer for simplicity):
 
@@ -192,12 +414,12 @@ fn usb_request_async<'a>(
 ```
 
 ```
-error[E0759]: `buffer` has lifetime `'a` but it needs to satisfy a `'static` lifetime requirement
+error: `buffer` has lifetime `'a` but it needs to satisfy a `'static` lifetime requirement
 ```
 
 ---
 
-## Temporal memory safety
+## Temporal Memory Safety
 
 Change a little bit according to the error message:
 
@@ -215,7 +437,7 @@ fn usb_request_async(
 
 ---
 
-## Temporal memory safety
+## Temporal Memory Safety
 
 Then use `usb_request_async`:
 
@@ -231,12 +453,12 @@ fn func() {
 ```
 
 ```
-error[E0597]: `buffer` does not live long enough
+error: `buffer` does not live long enough
 ```
 
 ---
 
-## Temporal memory safety
+## Temporal Memory Safety
 
 Possibly a better design:
 
@@ -257,7 +479,7 @@ impl Urb {
 
 ---
 
-## Temporal memory safety
+## Temporal Memory Safety
 
 ```rust
 fn usb_send_urb_async(urb: Urb) {
@@ -279,61 +501,104 @@ fn func() {
 
 ---
 
-## Thread safety
+## Thread Safety
 
-Features of Rust to prevent from data races:
+Mutable static variables can't be accessed **safely**:
 
-- Global static variables can't be modified *safely*
+```rust
+static mut BALANCE: u32 = 1;
 
-  ```rust
-  static mut GLOBAL_INT: u32 = 1;
+fn func() {
+    std::thread::spawn(|| BALANCE += 2);
+    BALANCE -= 1;
+}
+```
 
-  fn func() {
-      // bad practice
-      std::thread::spawn(|| unsafe { GLOBAL_INT = 3 });
-      unsafe { GLOBAL_INT = 2 }
-  }
-  ```
-
----
-
-## Thread safety
-
-- Variables that are shared between threads must impl `Sync`
-  ```rust
-  // static GLOBAL_INT_BAD: RefCell<u32> = RefCell::new(1);
-  lazy_static! {
-      static ref GLOBAL_INT: Mutex<u32> = Mutex::new(1);
-  }
-
-  fn func() {
-      std::thread::spawn(|| *GLOBAL_INT.lock().unwrap() = 3);
-      *GLOBAL_INT.lock().unwrap() = 2;
-  }
-  ```
+```
+error: use of mutable static is unsafe and requires unsafe function or block
+```
 
 ---
 
-## Thread safety
+## Thread Safety
 
-- Variables that are sent across threads must impl `Send`
+So you may want interior mutability:
 
-  ```rust
-  fn func() {
-      let shared_int = Arc::new(Mutex::new(1));
-      let shared_int_clone = shared_int.clone();
-  
-      std::thread::spawn(move || *shared_int_clone.lock().unwrap() = 3);
-      *shared_int.lock().unwrap() = 2;
-  }
-  ```
+```rust
+static BALANCE: RefCell<u32> = RefCell::new(1);
+
+fn func() {
+    std::thread::spawn(|| BALANCE.replace_with(|&mut old| old + 2));
+    BALANCE.replace_with(|&mut old| old - 1);
+}
+```
+
+```
+error: `RefCell<u32>` cannot be shared between threads safely
+```
 
 ---
+
+## Thread Safety
+
+Variables shared between threads must impl `Sync` trait:
+
+- `AtomicXXX`, `Mutex`, Crossbeam, etc.
+
+```rust
+static BALANCE: AtomicU32 = AtomicU32::new(1);
+
+fn func() {
+    std::thread::spawn(|| BALANCE.fetch_add(2, Ordering::Relaxed));
+    BALANCE.fetch_sub(1, Ordering::Relaxed);
+}
+```
+
+---
+
+## Thread Safety
+
+Another way to share - multiple ownership:
+
+```rust
+fn func() {
+    let balance = Rc::new(AtomicU32::new(1));
+    let balance_clone = balance.clone();
+    std::thread::spawn(move || balance_clone.fetch_add(2, Ordering::Relaxed));
+    balance.fetch_sub(1, Ordering::Relaxed);
+}
+```
+
+```
+error: `Rc<AtomicU32>` cannot be sent between threads safely
+```
+
+---
+
+## Thread Safety
+
+Variables sent across threads must impl `Send` trait:
+
+```rust
+fn func() {
+    let balance = Arc::new(AtomicU32::new(1));
+    let balance_clone = balance.clone();
+    std::thread::spawn(move || balance_clone.fetch_add(2, Ordering::Relaxed));
+    balance.fetch_sub(1, Ordering::Relaxed);
+}
+```
+
+---
+
+<!--
+backgroundImage: url('assets/bg-outline.png')
+-->
 
 ## Outline
 
-- Safety
-- **Expression** 👈
+- Language Basics
+- Memory Safety
+- **Expression ◁**
 - Interoperability
 - Performance
 - Usability
@@ -341,6 +606,10 @@ Features of Rust to prevent from data races:
 - Summary
 
 ---
+
+<!--
+backgroundImage: url('assets/bg.png')
+-->
 
 ## Expression
 
@@ -352,20 +621,19 @@ In practice, ALMOST, with some `unsafe` code. When you can't implement some logi
 
 ---
 
-## Expression
+## Low Level Programming
 
-Example for booting:
+Booting:
 
 ```rust
+global_asm!(include_str!("entry.asm"));
+
 #[no_mangle]
 #[link_section = ".text.boot"]
 extern "C" fn _start_rust() -> ! {
     #[link_section = ".data.boot"]
     static START: spin::Once<()> = spin::Once::new();
-    START.call_once(|| {
-        clear_bss();
-        memory::create_boot_pt();
-    });
+    START.call_once(|| { clear_bss(); memory::create_boot_pt(); });
     memory::enable_mmu();
     unsafe { _start_kernel() }
 }
@@ -373,14 +641,39 @@ extern "C" fn _start_rust() -> ! {
 
 ---
 
-## Expression
+## Low Level Programming
 
-Example for driver:
+Accessing system registers:
+
+```rust
+#[link_section = ".text.boot"]
+pub fn enable_mmu() {
+    // set memory attribute indirection
+    MAIR_EL1.write(...);
+    // configure stage 1 of the EL1 translation regime
+    TCR_EL1.write(...);
+    // set both TTBR0_EL1 and TTBR1_EL1
+    let pgd_frame = PhysFrame::<Size4KiB>::of_addr(unsafe { &BOOT_PGD as *const PageTable } as u64);
+    translation::ttbr_el1_write(0, pgd_frame);
+    translation::ttbr_el1_write(1, pgd_frame);
+    translation::local_invalidate_tlb_all();
+    // enable MMU
+    SCTLR_EL1.modify(SCTLR_EL1::M::Enable + SCTLR_EL1::C::Cacheable + SCTLR_EL1::I::Cacheable);
+    // ensure that MMU is enabled before the next instruction
+    unsafe { barrier::isb() }
+}
+```
+
+---
+
+## Low Level Programming
+
+Driver:
 
 ```rust
 fn handle_irq(&self) {
     loop {
-        let irqstat = self.read_cpu_reg(GICC_IAR);
+        let irqstat = self.read_cpu_reg(GICC_IAR); /* MMIO inside */
         let irqnr = irqstat & GICC_IAR_INT_ID_MASK;
         match irqnr {
             0..=15 => crate::irq::handle_inter_processor(irqnr),
@@ -395,11 +688,9 @@ fn handle_irq(&self) {
 
 ---
 
-## Expression
+## More Features
 
-Much better than C:
-
-- Module: better modularity
+- Crate & Module: better modularity
 - Ownership & Lifetime: memory safety
 - Trait: generic programming
 - Result & Error: better error handling
@@ -408,27 +699,124 @@ Much better than C:
 
 ---
 
-## Expression
+## More Features
 
-Compared to C++:
+Traits in drivers:
 
-- Similar funtionality
-- Safe by default
-- `core` and `alloc` crates without need for `std`
+```rust
+pub trait IrqChip {
+    fn enable_local_irq(&self, ppi: u32);
+    // ...
+    fn handle_irq(&self);
+}
+
+pub struct Gic { /* ... */ }
+
+impl IrqChip for Gic {
+    fn enable_local_irq(&self, ppi: u32) { /* ... */ }
+    // ...
+    fn handle_irq(&self) { /* ... */ }
+}
+```
 
 ---
 
+## More Features
+
+Traits in memory management:
+
+```rust
+pub trait HardwareMemory {
+    fn memory_get_available_ram() -> Vec<Range<PhysAddr>>;
+
+    type PageTable: PageTable;
+}
+
+pub trait PageTable {
+    fn new(is_kernel: bool) -> Self;
+    unsafe fn map_kernel(&mut self) -> KernResult<()>;
+    unsafe fn map(&mut self, va_range: Range<VirtAddr>, pa: PhysAddr, ...) -> KernResult<()>;
+}
+```
+
+---
+
+## More Features
+
+```rust
+impl HardwareMemory for hw {
+    fn memory_get_available_ram() -> Vec<Range<PhysAddr>> { /* ... */ }
+
+    type PageTable = PageTableImpl;
+}
+
+pub struct PageTableImpl { /* ... */ }
+
+impl PageTable for PageTableImpl { /* ... */ }
+```
+
+---
+
+## More Features
+
+Functional programming:
+
+```rust
+pub(super) fn init() {
+    let mut allocator = FRAME_ALLOCATOR.lock();
+    hw::memory_get_available_ram().iter().for_each(|range| {
+        let start_pfn = phys_to_pfn(align_up(range.start));
+        let end_pfn = phys_to_pfn(align_down(range.end));
+        allocator.add_frame(start_pfn, end_pfn);
+    })
+}
+
+pub unsafe fn alloc_frame() -> Option<PhysAddr> {
+    FRAME_ALLOCATOR.lock().alloc(1).map(pfn_to_phys)
+}
+```
+
+---
+
+## More Features
+
+DSL supported by macro:
+
+```rust
+register_bitfields! {u64,
+    pub SCTLR_EL1 [
+        I   OFFSET(12) NUMBITS(1) [ NonCacheable = 0, Cacheable = 1 ],
+        NAA OFFSET(6)  NUMBITS(1) [ Disable = 0, Enable = 1 ],
+        SA0 OFFSET(4)  NUMBITS(1) [ Disable = 0, Enable = 1 ],
+        SA  OFFSET(3)  NUMBITS(1) [ Disable = 0, Enable = 1 ],
+        C   OFFSET(2)  NUMBITS(1) [ NonCacheable = 0, Cacheable = 1 ],
+        // ...
+    ]
+}
+```
+
+---
+
+<!--
+backgroundImage: url('assets/bg-outline.png')
+-->
+
 ## Outline
 
-- Safety
+- Language Basics
+- Memory Safety
 - Expression
-- **Interoperability** 👈
+- **Interoperability ◁**
 - Performance
 - Usability
 - Drawbacks
 - Summary
 
 ---
+
+<!--
+backgroundImage: url('assets/bg.png')
+-->
 
 ## Interoperability
 
@@ -470,17 +858,35 @@ void func() {
 
 ---
 
+## Interoperability
+
+- Chromium: [Rust and C++ interoperability](https://www.chromium.org/Home/chromium-security/memory-safety/rust-and-c-interoperability)
+- Firefox: [Integrating Rust and C++ in Firefox](https://manishearth.github.io/blog/2021/02/22/integrating-rust-and-c-plus-plus-in-firefox/)
+- Android: [Rust/C++ interop in the Android Platform](https://security.googleblog.com/2021/06/rustc-interop-in-android-platform.html)
+- Linux: [Supporting Linux kernel development in Rust](https://lwn.net/Articles/829858/)
+
+---
+
+<!--
+backgroundImage: url('assets/bg-outline.png')
+-->
+
 ## Outline
 
-- Safety
+- Language Basics
+- Memory Safety
 - Expression
 - Interoperability
-- **Performance** 👈
+- **Performance ◁**
 - Usability
 - Drawbacks
 - Summary
 
 ---
+
+<!--
+backgroundImage: url('assets/bg.png')
+-->
 
 ## Performance
 
@@ -496,31 +902,26 @@ Features that make Rust fast:
 
 ---
 
-## Performance
-
-Open source projects (re)written in Rust that're proved to be fast(er):
-
-- [ripgrep](https://github.com/BurntSushi/ripgrep)
-- [alacritty](https://github.com/alacritty/alacritty)
-- [fd](https://github.com/sharkdp/fd)
-- [actix-web](https://github.com/actix/actix-web)
-- [serde](https://github.com/serde-rs/serde)
-- [servo](https://github.com/servo/servo)
-- ......
-
----
+<!--
+backgroundImage: url('assets/bg-outline.png')
+-->
 
 ## Outline
 
-- Safety
+- Language Basics
+- Memory Safety
 - Expression
 - Interoperability
 - Performance
-- **Usability** 👈
+- **Usability ◁**
 - Drawbacks
 - Summary
 
 ---
+
+<!--
+backgroundImage: url('assets/bg.png')
+-->
 
 ## Usability
 
@@ -539,7 +940,7 @@ Tools:
 
 ## Usability
 
-Example for dependency management:
+Dependency management:
 
 ```toml
 [dependencies]
@@ -576,38 +977,56 @@ extern "C" fn _handle_interrupt(int_type: IntType) {
 
 ---
 
+<!--
+backgroundImage: url('assets/bg-outline.png')
+-->
+
 ## Outline
 
-- Safety
+- Language Basics
+- Memory Safety
 - Expression
 - Interoperability
 - Performance
 - Usability
-- **Drawbacks** 👈
+- **Drawbacks ◁**
 - Summary
 
 ---
+
+<!--
+backgroundImage: url('assets/bg.png')
+-->
 
 ## Drawbacks
 
 - Steep learning curve
 - Many unstable features
-- Slow compile speed
+- Low speed compilation
 - Small ecosystem (but growing quickly)
 
 ---
 
+<!--
+backgroundImage: url('assets/bg-outline.png')
+-->
+
 ## Outline
 
-- Safety
+- Language Basics
+- Memory Safety
 - Expression
 - Interoperability
 - Performance
 - Usability
 - Drawbacks
-- **Summary** 👈
+- **Summary ◁**
 
 ---
+
+<!--
+backgroundImage: url('assets/bg.png')
+-->
 
 ## Summary
 
@@ -615,7 +1034,7 @@ extern "C" fn _handle_interrupt(int_type: IntType) {
 - Rich language features without need for `std`
 - Harder to write, but easier to be correct once compiled
 - Easy-to-use tools
-- Backed by some big companies: Google, Microsoft, Mozilla, ...
+- Backed by big companies: Google, Microsoft, Huawei, Mozilla, ...
 - Future seems bright
 
 Special thanks to [Alex Chi](https://github.com/skyzh) for reviewing the slides.
@@ -626,10 +1045,10 @@ Special thanks to [Alex Chi](https://github.com/skyzh) for reviewing the slides.
 
 - [The Rust Programming Language](https://doc.rust-lang.org/book/) & [The Rustonomicon](https://doc.rust-lang.org/nomicon/)
 - [Considering Rust](https://www.youtube.com/watch?v=DnT-LUQgc7s) by Jon Gjengset
-- [Why Rust for safe systems programming](https://msrc-blog.microsoft.com/2019/07/22/why-rust-for-safe-systems-programming/) by MSRC
+- [Writing Linux Kernel Modules in Safe Rust](https://www.youtube.com/watch?v=RyY01fRyGhM) by Geoffrey Thomas & Alex Gaynor
 - [Implications of Rewriting a Browser Component in Rust](https://hacks.mozilla.org/rewriting-a-browser-component-in-rust/) by Diane Hosfelt
 - [Speed of Rust vs C](https://kornel.ski/rust-c-speed) by kornelski
-- [C++ Is Faster and Safer Than Rust: Benchmarked by Yandex](https://www.viva64.com/en/b/0733/) by Roman Proskuryakov
+- [C++ Is Faster and Safer Than Rust: Benchmarked by Yandex](https://pvs-studio.com/en/blog/posts/0733/) by Roman Proskuryakov
 
 ---
 
